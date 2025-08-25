@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle de Gastos Mensais</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .modal-backdrop {
+            transition: opacity 0.3s ease;
+        }
+        .modal-content {
+            transition: transform 0.3s ease;
+        }
+        #expenses-chart {
+            cursor: pointer;
+        }
+        .month-tab .actions {
+            display: none;
+        }
+        .month-tab:hover .actions {
+            display: flex;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-900">Controle de Gastos Mensais</h1>
+            <p class="text-gray-600 mt-1">Sua vida financeira organizada de forma simples e visual.</p>
+        </header>
+
+        <!-- Abas dos Meses -->
+        <div class="mb-6 border-b border-gray-200">
+            <nav id="month-tabs" class="flex items-center space-x-1 -mb-px" aria-label="Tabs">
+                <!-- Abas serão geradas dinamicamente -->
+            </nav>
+        </div>
+
+        <main id="main-content">
+            <!-- Resumo Financeiro -->
+            <section class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="bg-white p-6 rounded-xl border border-gray-200">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-sm font-medium text-gray-500">Total de Receitas</h3>
+                        <i data-lucide="arrow-up-circle" class="h-6 w-6 text-green-500"></i>
+                    </div>
+                    <p id="total-revenue" class="text-3xl font-semibold text-green-600 mt-2">R$ 0,00</p>
+                </div>
+                <div class="bg-white p-6 rounded-xl border border-gray-200">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-sm font-medium text-gray-500">Total de Despesas</h3>
+                        <i data-lucide="arrow-down-circle" class="h-6 w-6 text-red-500"></i>
+                    </div>
+                    <p id="total-expenses" class="text-3xl font-semibold text-red-600 mt-2">R$ 0,00</p>
+                </div>
+                <div class="bg-white p-6 rounded-xl border border-gray-200">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-sm font-medium text-gray-500">Saldo do Mês</h3>
+                        <i data-lucide="scale" class="h-6 w-6 text-blue-500"></i>
+                    </div>
+                    <p id="balance" class="text-3xl font-semibold text-blue-600 mt-2">R$ 0,00</p>
+                </div>
+            </section>
+
+            <!-- Análise e Gráfico -->
+            <section class="grid grid-cols-1 lg:grid-cols-5 gap-8 mb-8">
+                <div class="lg:col-span-2 bg-white p-6 rounded-xl border border-gray-200">
+                    <h3 class="text-lg font-semibold mb-4">Gastos por Categoria</h3>
+                    <div id="category-summary" class="space-y-3 max-h-80 overflow-y-auto">
+                        <p class="text-gray-500">Nenhuma despesa registrada.</p>
+                    </div>
+                </div>
+                <div class="lg:col-span-3 bg-white p-6 rounded-xl border border-gray-200 flex items-center justify-center min-h-[300px]">
+                    <canvas id="expenses-chart"></canvas>
+                </div>
+            </section>
+
+            <!-- Tabela de Lançamentos -->
+            <section class="bg-white p-6 rounded-xl border border-gray-200">
+                <div class="flex flex-wrap justify-between items-center mb-4 gap-4">
+                    <h3 class="text-lg font-semibold">Lançamentos do Mês</h3>
+                    <button id="add-transaction-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center gap-2">
+                        <i data-lucide="plus" class="h-5 w-5"></i>
+                        Novo Lançamento
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead class="border-b bg-gray-50">
+                            <tr>
+                                <th class="p-4 font-semibold">Data</th>
+                                <th class="p-4 font-semibold">Descrição</th>
+                                <th class="p-4 font-semibold">Categoria</th>
+                                <th class="p-4 font-semibold text-right">Valor</th>
+                                <th class="p-4 font-semibold text-center">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="transaction-table-body">
+                           <!-- Linhas da tabela serão geradas dinamicamente -->
+                        </tbody>
+                    </table>
+                    <div id="empty-state" class="text-center py-12 text-gray-500">
+                        <i data-lucide="folder-open" class="h-12 w-12 mx-auto mb-4 text-gray-400"></i>
+                        <p>Nenhum lançamento para este mês.</p>
+                        <p class="text-sm">Clique em "Novo Lançamento" para começar.</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modal para Adicionar/Editar Lançamento -->
+    <div id="transaction-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 modal-backdrop opacity-0 pointer-events-none">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-8 modal-content transform scale-95">
+            <div class="flex justify-between items-center mb-6">
+                <h2 id="modal-title" class="text-2xl font-bold">Novo Lançamento</h2>
+                <button id="close-modal-btn" class="text-gray-400 hover:text-gray-600">
+                    <i data-lucide="x" class="h-6 w-6"></i>
+                </button>
+            </div>
+            <form id="transaction-form">
+                <input type="hidden" id="transaction-id" name="transactionId">
+                <div class="space-y-4">
+                    <div>
+                        <label for="type" class="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
+                        <select id="type" name="type" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                            <option value="expense">Despesa</option>
+                            <option value="revenue">Receita</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="description" class="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
+                        <input type="text" id="description" name="description" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" placeholder="Ex: Compras no supermercado">
+                    </div>
+                    <div>
+                        <label for="amount" class="block text-sm font-medium text-gray-700 mb-1">Valor</label>
+                        <input type="number" id="amount" name="amount" step="0.01" min="0" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" placeholder="0,00">
+                    </div>
+                    <div>
+                        <label for="date" class="block text-sm font-medium text-gray-700 mb-1">Data</o>
+                        <input type="date" id="date" name="date" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label for="category" class="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
+                        <select id="category" name="category" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                            <option>Transporte</option>
+                            <option>Alimentação</option>
+                            <option>Mercado</option>
+                            <option>Saúde</option>
+                            <option>Lazer</option>
+                            <option>Educação</option>
+                            <option>Dízimo</option>
+                            <option>Compras Pessoais</option>
+                            <option>Presentes</option>
+                            <option>Contas a Pagar</option>
+                            <option>Salário</option>
+                            <option>Investimentos</option>
+                            <option>Outros</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mt-8 flex justify-end">
+                    <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors">Salvar Lançamento</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Modal para Detalhes da Categoria -->
+    <div id="category-detail-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 modal-backdrop opacity-0 pointer-events-none">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg p-8 modal-content transform scale-95">
+            <div class="flex justify-between items-center mb-6">
+                <h2 id="category-modal-title" class="text-2xl font-bold">Detalhes da Categoria</h2>
+                <button id="close-category-modal-btn" class="text-gray-400 hover:text-gray-600">
+                    <i data-lucide="x" class="h-6 w-6"></i>
+                </button>
+            </div>
+            <div id="category-modal-body" class="max-h-96 overflow-y-auto">
+                <!-- Conteúdo dinâmico -->
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Inicializa os ícones
+            lucide.createIcons();
+
+            // --- ESTADO DA APLICAÇÃO ---
+            let state = {
+                currentMonth: '',
+                months: {}
+            };
+
+            // --- ELEMENTOS DO DOM ---
+            const monthTabsContainer = document.getElementById('month-tabs');
+            const totalRevenueEl = document.getElementById('total-revenue');
+            const totalExpensesEl = document.getElementById('total-expenses');
+            const balanceEl = document.getElementById('balance');
+            const categorySummaryEl = document.getElementById('category-summary');
+            const transactionTableBody = document.getElementById('transaction-table-body');
+            const emptyStateEl = document.getElementById('empty-state');
+            
+            const transactionModal = document.getElementById('transaction-modal');
+            const transactionModalContent = transactionModal.querySelector('.modal-content');
+            const transactionForm = document.getElementById('transaction-form');
+            
+            const categoryDetailModal = document.getElementById('category-detail-modal');
+            const categoryModalContent = categoryDetailModal.querySelector('.modal-content');
+            const categoryModalTitle = document.getElementById('category-modal-title');
+            const categoryModalBody = document.getElementById('category-modal-body');
+            
+            // --- GRÁFICO ---
+            let expensesChart = null;
+            const chartCanvas = document.getElementById('expenses-chart').getContext('2d');
+
+            // --- FUNÇÕES DE UTILIDADE ---
+            const formatCurrency = (value) => {
+                return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+            };
+
+            const formatDate = (dateString, options = {}) => {
+                const date = new Date(dateString + 'T00:00:00');
+                return date.toLocaleDateString('pt-BR', { timeZone: 'UTC', ...options });
+            };
+
+            const getCurrentMonthYear = () => {
+                const now = new Date();
+                const month = now.toLocaleString('pt-BR', { month: 'long' });
+                const year = now.getFullYear();
+                return `${month.charAt(0).toUpperCase() + month.slice(1)}-${year}`;
+            };
+            
+            // --- GERENCIAMENTO DE ESTADO E DADOS LOCAIS ---
+            const saveState = () => {
+                localStorage.setItem('financeTrackerState', JSON.stringify(state));
+            };
+
+            const loadState = () => {
+                const savedState = localStorage.getItem('financeTrackerState');
+                if (savedState) {
+                    state = JSON.parse(savedState);
+                } else {
+                    const initialMonth = getCurrentMonthYear();
+                    state = {
+                        currentMonth: initialMonth,
+                        months: {
+                            [initialMonth]: { transactions: [] }
+                        }
+                    };
+                }
+            };
+
+            // --- FUNÇÕES DE RENDERIZAÇÃO ---
+            const render = () => {
+                renderMonthTabs();
+                renderSummary();
+                renderTransactions();
+                renderCategorySummary();
+                renderChart();
+            };
+            
+            const renderMonthTabs = () => {
+                monthTabsContainer.innerHTML = '';
+                Object.keys(state.months).forEach(month => {
+                    const isActive = month === state.currentMonth;
+                    const tabWrapper = document.createElement('div');
+                    tabWrapper.className = `month-tab relative flex items-center rounded-t-lg ${isActive ? 'bg-white' : 'bg-gray-100 hover:bg-gray-200'}`;
+
+                    const tabButton = document.createElement('button');
+                    tabButton.dataset.month = month;
+                    tabButton.className = `whitespace-nowrap py-3 px-4 font-medium text-sm ${isActive ? 'text-blue-700' : 'text-gray-500'}`;
+                    tabButton.textContent = month.replace('-', ' de ');
+                    
+                    tabWrapper.appendChild(tabButton);
+
+                    const actionsDiv = document.createElement('div');
+                    actionsDiv.className = 'actions absolute right-1 top-1/2 -translate-y-1/2 bg-gray-200 rounded-full p-1';
+                    actionsDiv.innerHTML = `
+                        <button data-month="${month}" class="edit-month-btn p-1 text-gray-600 hover:text-blue-600 rounded-full"><i data-lucide="pencil" class="h-3 w-3"></i></button>
+                        <button data-month="${month}" class="delete-month-btn p-1 text-gray-600 hover:text-red-600 rounded-full"><i data-lucide="trash-2" class="h-3 w-3"></i></button>
+                    `;
+                    tabWrapper.appendChild(actionsDiv);
+                    monthTabsContainer.appendChild(tabWrapper);
+                });
+
+                const addMonthButton = document.createElement('button');
+                addMonthButton.id = 'add-month-btn';
+                addMonthButton.className = 'py-3 px-4 text-blue-600 hover:text-blue-800 flex items-center gap-1';
+                addMonthButton.innerHTML = `<i data-lucide="plus-circle" class="h-4 w-4"></i> Adicionar Mês`;
+                monthTabsContainer.appendChild(addMonthButton);
+                lucide.createIcons();
+            };
+
+            const renderSummary = () => {
+                const transactions = state.months[state.currentMonth]?.transactions || [];
+                const revenue = transactions.filter(t => t.type === 'revenue').reduce((sum, t) => sum + t.amount, 0);
+                const expenses = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+                const balance = revenue - expenses;
+
+                totalRevenueEl.textContent = formatCurrency(revenue);
+                totalExpensesEl.textContent = formatCurrency(expenses);
+                balanceEl.textContent = formatCurrency(balance);
+                balanceEl.classList.toggle('text-red-600', balance < 0);
+                balanceEl.classList.toggle('text-blue-600', balance >= 0);
+            };
+
+            const renderTransactions = () => {
+                transactionTableBody.innerHTML = '';
+                const transactions = state.months[state.currentMonth]?.transactions || [];
+                
+                if (transactions.length === 0) {
+                    emptyStateEl.style.display = 'block';
+                    transactionTableBody.parentElement.classList.add('hidden');
+                } else {
+                    emptyStateEl.style.display = 'none';
+                    transactionTableBody.parentElement.classList.remove('hidden');
+                    
+                    const sortedTransactions = [...transactions].sort((a, b) => new Date(b.date) - new Date(a.date));
+                    
+                    let lastDate = null;
+                    sortedTransactions.forEach(t => {
+                        if (t.date !== lastDate) {
+                            const dateDividerRow = document.createElement('tr');
+                            dateDividerRow.innerHTML = `<td colspan="5" class="bg-gray-100 p-2 font-bold text-gray-600">${formatDate(t.date, { weekday: 'long', day: 'numeric', month: 'long' })}</td>`;
+                            transactionTableBody.appendChild(dateDividerRow);
+                            lastDate = t.date;
+                        }
+
+                        const row = document.createElement('tr');
+                        row.className = 'border-b hover:bg-gray-50';
+                        const isExpense = t.type === 'expense';
+                        
+                        row.innerHTML = `
+                            <td class="p-4 text-sm text-gray-500">${formatDate(t.date)}</td>
+                            <td class="p-4 font-medium">${t.description}</td>
+                            <td class="p-4"><span class="bg-gray-200 text-gray-700 text-xs font-medium px-2.5 py-1 rounded-full">${t.category}</span></td>
+                            <td class="p-4 text-right font-medium ${isExpense ? 'text-red-600' : 'text-green-600'}">
+                                ${isExpense ? '-' : '+'} ${formatCurrency(t.amount)}
+                            </td>
+                            <td class="p-4 text-center">
+                                <div class="flex items-center justify-center gap-2">
+                                    <button data-id="${t.id}" class="edit-btn text-gray-400 hover:text-blue-500 p-1">
+                                        <i data-lucide="edit" class="h-5 w-5"></i>
+                                    </button>
+                                    <button data-id="${t.id}" class="delete-btn text-gray-400 hover:text-red-500 p-1">
+                                        <i data-lucide="trash-2" class="h-5 w-5"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        `;
+                        transactionTableBody.appendChild(row);
+                    });
+                    lucide.createIcons();
+                }
+            };
+            
+            const renderCategorySummary = () => {
+                categorySummaryEl.innerHTML = '';
+                const expenses = state.months[state.currentMonth]?.transactions.filter(t => t.type === 'expense') || [];
+                
+                if (expenses.length === 0) {
+                    categorySummaryEl.innerHTML = '<p class="text-gray-500">Nenhuma despesa registrada.</p>';
+                    return;
+                }
+
+                const categoryTotals = expenses.reduce((acc, t) => {
+                    acc[t.category] = (acc[t.category] || 0) + t.amount;
+                    return acc;
+                }, {});
+
+                const sortedCategories = Object.entries(categoryTotals).sort(([, a], [, b]) => b - a);
+                const totalExpenses = expenses.reduce((sum, t) => sum + t.amount, 0);
+
+                sortedCategories.forEach(([category, total]) => {
+                    const percentage = totalExpenses > 0 ? (total / totalExpenses) * 100 : 0;
+                    const div = document.createElement('div');
+                    div.innerHTML = `
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-sm font-medium">${category}</span>
+                            <span class="text-sm font-semibold">${formatCurrency(total)}</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div class="bg-blue-600 h-2 rounded-full" style="width: ${percentage}%"></div>
+                        </div>
+                    `;
+                    categorySummaryEl.appendChild(div);
+                });
+            };
+
+            const renderChart = () => {
+                const expenses = state.months[state.currentMonth]?.transactions.filter(t => t.type === 'expense') || [];
+                const categoryTotals = expenses.reduce((acc, t) => {
+                    acc[t.category] = (acc[t.category] || 0) + t.amount;
+                    return acc;
+                }, {});
+
+                const labels = Object.keys(categoryTotals);
+                const data = Object.values(categoryTotals);
+
+                if (expensesChart) {
+                    expensesChart.destroy();
+                }
+
+                if (labels.length > 0) {
+                    expensesChart = new Chart(chartCanvas, {
+                        type: 'doughnut',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Gastos por Categoria',
+                                data: data,
+                                backgroundColor: ['#3b82f6', '#ef4444', '#22c55e', '#eab308', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'],
+                                borderColor: '#ffffff',
+                                borderWidth: 4
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            onClick: (event, elements) => {
+                                if (elements.length > 0) {
+                                    const elementIndex = elements[0].index;
+                                    const category = expensesChart.data.labels[elementIndex];
+                                    showCategoryDetails(category);
+                                }
+                            },
+                            plugins: {
+                                legend: { position: 'bottom' },
+                                title: { display: true, text: 'Distribuição de Despesas' }
+                            }
+                        }
+                    });
+                } else {
+                    const ctx = chartCanvas;
+                    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.font = '16px Inter';
+                    ctx.fillStyle = '#6b7280';
+                    ctx.fillText('Sem dados de despesas para exibir.', ctx.canvas.width / 2, ctx.canvas.height / 2);
+                }
+            };
+
+            // --- MANIPULADORES DE EVENTOS ---
+            const handleSaveTransaction = (e) => {
+                e.preventDefault();
+                const formData = new FormData(transactionForm);
+                const transactionId = formData.get('transactionId');
+                
+                const transactionData = {
+                    type: formData.get('type'),
+                    description: formData.get('description'),
+                    amount: parseFloat(formData.get('amount')),
+                    date: formData.get('date'),
+                    category: formData.get('category'),
+                };
+
+                if (transactionId) {
+                    const transactionIndex = state.months[state.currentMonth].transactions.findIndex(t => t.id === transactionId);
+                    if (transactionIndex > -1) {
+                        state.months[state.currentMonth].transactions[transactionIndex] = { ...state.months[state.currentMonth].transactions[transactionIndex], ...transactionData };
+                    }
+                } else {
+                    transactionData.id = Date.now().toString();
+                    state.months[state.currentMonth].transactions.push(transactionData);
+                }
+
+                saveState();
+                render();
+                closeTransactionModal();
+            };
+            
+            const handleTableActions = (e) => {
+                const button = e.target.closest('button');
+                if (!button) return;
+                const id = button.dataset.id;
+                if (!id) return;
+
+                if (button.classList.contains('delete-btn')) {
+                    if (confirm('Tem certeza que deseja excluir este lançamento?')) {
+                        state.months[state.currentMonth].transactions = state.months[state.currentMonth].transactions.filter(t => t.id !== id);
+                        saveState();
+                        render();
+                    }
+                } else if (button.classList.contains('edit-btn')) {
+                    const transactionToEdit = state.months[state.currentMonth].transactions.find(t => t.id === id);
+                    if (transactionToEdit) openTransactionModal(transactionToEdit);
+                }
+            };
+            
+            const handleMonthTabActions = (e) => {
+                const button = e.target.closest('button');
+                if (!button) return;
+
+                const month = button.dataset.month;
+                if (!month) return;
+
+                if (button.classList.contains('edit-month-btn')) {
+                    handleEditMonth(month);
+                } else if (button.classList.contains('delete-month-btn')) {
+                    handleDeleteMonth(month);
+                } else {
+                    // Switch month
+                    state.currentMonth = month;
+                    saveState();
+                    render();
+                }
+            };
+            
+            const handleEditMonth = (oldMonth) => {
+                const newMonth = prompt("Digite o novo nome para o mês (ex: Agosto-2025):", oldMonth);
+                if (newMonth && newMonth !== oldMonth && !state.months[newMonth]) {
+                    // Create new entry, copy data, delete old one
+                    state.months[newMonth] = state.months[oldMonth];
+                    delete state.months[oldMonth];
+                    
+                    if (state.currentMonth === oldMonth) {
+                        state.currentMonth = newMonth;
+                    }
+                    saveState();
+                    render();
+                } else if (state.months[newMonth]) {
+                    console.warn("Este mês já existe!");
+                }
+            };
+            
+            const handleDeleteMonth = (monthToDelete) => {
+                 if (Object.keys(state.months).length <= 1) {
+                    console.warn("Não é possível excluir o último mês.");
+                    return;
+                }
+                if (confirm(`Tem certeza que deseja excluir o mês "${monthToDelete.replace('-', ' de ')}"? Todos os seus lançamentos serão perdidos.`)) {
+                    delete state.months[monthToDelete];
+                    
+                    if (state.currentMonth === monthToDelete) {
+                        state.currentMonth = Object.keys(state.months)[0];
+                    }
+                    saveState();
+                    render();
+                }
+            };
+            
+            const handleAddMonth = () => {
+                const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+                const monthKeys = Object.keys(state.months);
+                const lastMonthKey = monthKeys[monthKeys.length - 1];
+                
+                const [lastMonthName, lastYear] = lastMonthKey.split('-');
+                const lastMonthIndex = monthNames.indexOf(lastMonthName);
+                
+                const nextMonthDate = new Date(lastYear, lastMonthIndex);
+                nextMonthDate.setMonth(nextMonthDate.getMonth() + 1);
+                
+                const nextMonthName = monthNames[nextMonthDate.getMonth()];
+                const nextYear = nextMonthDate.getFullYear();
+                
+                const newMonthKey = `${nextMonthName}-${nextYear}`;
+
+                if (!state.months[newMonthKey]) {
+                    state.months[newMonthKey] = { transactions: [] };
+                    state.currentMonth = newMonthKey;
+                    saveState();
+                    render();
+                } else {
+                     console.warn("O próximo mês já existe!");
+                }
+            };
+
+            // --- CONTROLES DOS MODAIS ---
+            const openTransactionModal = (transaction = null) => {
+                transactionForm.reset();
+                const modalTitle = document.getElementById('modal-title');
+                const transactionIdInput = document.getElementById('transaction-id');
+
+                if (transaction) {
+                    modalTitle.textContent = 'Editar Lançamento';
+                    transactionIdInput.value = transaction.id;
+                    document.getElementById('type').value = transaction.type;
+                    document.getElementById('description').value = transaction.description;
+                    document.getElementById('amount').value = transaction.amount;
+                    document.getElementById('date').value = transaction.date;
+                    document.getElementById('category').value = transaction.category;
+                } else {
+                    modalTitle.textContent = 'Novo Lançamento';
+                    transactionIdInput.value = '';
+                    document.getElementById('date').valueAsDate = new Date();
+                }
+
+                transactionModal.classList.remove('pointer-events-none', 'opacity-0');
+                transactionModalContent.classList.remove('scale-95');
+            };
+
+            const closeTransactionModal = () => {
+                transactionModal.classList.add('pointer-events-none', 'opacity-0');
+                transactionModalContent.classList.add('scale-95');
+            };
+
+            const showCategoryDetails = (category) => {
+                const transactionsForCategory = state.months[state.currentMonth].transactions.filter(
+                    t => t.type === 'expense' && t.category === category
+                ).sort((a, b) => new Date(b.date) - new Date(a.date));
+
+                categoryModalTitle.textContent = `Lançamentos em ${category}`;
+                categoryModalBody.innerHTML = '';
+
+                if (transactionsForCategory.length > 0) {
+                    const list = document.createElement('ul');
+                    list.className = 'space-y-3';
+                    transactionsForCategory.forEach(t => {
+                        const item = document.createElement('li');
+                        item.className = 'flex justify-between items-center p-3 bg-gray-50 rounded-lg';
+                        item.innerHTML = `
+                            <div>
+                                <p class="font-medium">${t.description}</p>
+                                <p class="text-sm text-gray-500">${formatDate(t.date)}</p>
+                            </div>
+                            <span class="font-semibold text-red-600">${formatCurrency(t.amount)}</span>
+                        `;
+                        list.appendChild(item);
+                    });
+                    categoryModalBody.appendChild(list);
+                } else {
+                    categoryModalBody.innerHTML = '<p class="text-gray-500">Nenhum lançamento encontrado para esta categoria.</p>';
+                }
+                
+                categoryDetailModal.classList.remove('pointer-events-none', 'opacity-0');
+                categoryModalContent.classList.remove('scale-95');
+            };
+
+            const closeCategoryDetailModal = () => {
+                categoryDetailModal.classList.add('pointer-events-none', 'opacity-0');
+                categoryModalContent.classList.add('scale-95');
+            };
+
+
+            // --- REGISTRO DE EVENTOS ---
+            transactionForm.addEventListener('submit', handleSaveTransaction);
+            transactionTableBody.addEventListener('click', handleTableActions);
+            monthTabsContainer.addEventListener('click', (e) => {
+                if (e.target.closest('#add-month-btn')) {
+                    handleAddMonth();
+                } else {
+                    handleMonthTabActions(e);
+                }
+            });
+
+            document.getElementById('add-transaction-btn').addEventListener('click', () => openTransactionModal());
+            document.getElementById('close-modal-btn').addEventListener('click', closeTransactionModal);
+            transactionModal.addEventListener('click', (e) => {
+                if (e.target === transactionModal) closeTransactionModal();
+            });
+
+            document.getElementById('close-category-modal-btn').addEventListener('click', closeCategoryDetailModal);
+            categoryDetailModal.addEventListener('click', (e) => {
+                if (e.target === categoryDetailModal) closeCategoryDetailModal();
+            });
+
+            // --- INICIALIZAÇÃO ---
+            loadState();
+            render();
+        });
+    </script>
+</body>
+</html>
